@@ -354,7 +354,7 @@ EOF
     systemctl restart dnsmasq > /dev/null 2>&1
     systemctl restart hostapd > /dev/null 2>&1
     sysctl net.ipv4.ip_forward=1 > /dev/null 2>&1
-
+    echo "Wireless setup complete."
     echo "The wireless network has been successfully set up" > wifi_setup_done
 fi
 }
