@@ -23,10 +23,3 @@ Legal Authorization refers to having explicit permission from the rightful owner
 By accessing, downloading, or using these scripts, you affirm that you have read, understood, and agreed to these terms. If not in agreement, refrain from using these scripts.
 
 The creator reserves the right to update or modify this disclaimer without prior notice.
-
-
-
-DESCRIPTION:
-
-
-Bash Script that can be run on Kali Linux, to set up a wireless access point. Once the access point is set up, the user can connect to the WiFi network and proceed to capturing the and cracking the WPA handshake, using a wireless interface, followed by a dictionary attack on the captured handshake. This script requires 2 wireless interfaces - one for the wireless network and another for capturing the WPA handshake. This script can be run on a VM or a physical device, such as a raspberry pi. 
