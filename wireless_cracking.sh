@@ -223,7 +223,7 @@ get_bssid(){
             esac
             done
     else
-        echo "No BSSID found for SSID '$TARGET_SSID'"
+        echo -e "${BOLD_RED}No BSSID found for SSID: '$TARGET_SSID'${NC}"
         echo "Exiting"
         exit 1
     fi
