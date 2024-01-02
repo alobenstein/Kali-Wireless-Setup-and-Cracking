@@ -331,6 +331,9 @@ trap handle_interrupt SIGINT
 
 check_for_wordlist() {
 while true; do
+    # Save the BSSID and SSID values
+    echo $BSSID > captured_handshake/bssid
+    echo $TARGET_SSID > captured_handshake/ssid
     # Prompt user for wordlist name
     echo ""
     echo -e "${MAGENTA}Enter a wordlist for cracking the pre-shared key.${NC}"
