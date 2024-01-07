@@ -18,7 +18,7 @@ Legal Authorization refers to having explicit permission from the rightful owner
 8. CONTACT: For queries or concerns related to this disclaimer or the scripts, contact Andrew Lobenstein at andrew@lobenstein.org
 9. LIMITATION OF LIABILITY: In no event shall the creator be liable for any damages whatsoever resulting from the use or inability to use these scripts.
 10. OPEN SOURCE LICENSE: These scripts are open source under the GNU Affero General Public License v3.0. Users must comply with the terms of this license in all uses of the scripts.
-11. REVISION DATE: This disclaimer was last updated on October 1, 2023.
+11. REVISION DATE: This disclaimer was last updated on January 1, 2024.
 
 By accessing, downloading, or using these scripts, you affirm that you have read, understood, and agreed to these terms. If not in agreement, refrain from using these scripts.
 
