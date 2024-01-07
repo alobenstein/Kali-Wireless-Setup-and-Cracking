@@ -896,5 +896,5 @@ check_for_wordlist
 # Crack the handshake
 crack_psk_and_process_output
 
-# Take interface out of monitor mode
+# Switch interface out of monitor mode
 airmon-ng stop $MON_INTERFACE &> /dev/null
