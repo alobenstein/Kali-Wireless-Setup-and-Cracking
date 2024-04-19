@@ -1,0 +1,691 @@
+# Install Freeradius Server / Utilities
+sudo apt-get install freeradius freeradius-utils
+sudo apt-get install rsyslog
+sudo apt install dnsmasq
+sudo apt install hostapd
+
+# Create a directory for backup freeradius configuration files:
+mkdir ~/freeradius
+
+
+#########################################################################################################################################################
+######################################################################### CLIENTS #######################################################################
+#########################################################################################################################################################
+
+# Create the Clients Configuration File
+sudo mv /etc/freeradius/3.0/clients.conf ~/freeradius/clients_bak.conf
+sudo vim /etc/freeradius/3.0/clients.conf
+
+#########################################################################################################################################################
+
+client localhost {
+        ipaddr = 127.0.0.1
+        proto = *  # Accepts both UDP and TCP, specify 'udp' or 'tcp' if needed
+        secret = <Insert Secret Key>  # Changed to a more secure secret
+        require_message_authenticator = no
+        nas_type = other  # localhost isn't usually a NAS...
+        limit {
+                max_connections = 16  # Maximum number of simultaneous TCP connections
+                lifetime = 0  # Lifetime of a TCP connection in seconds, 0 means forever
+                idle_timeout = 30  # Timeout for idle TCP connections in seconds
+        }
+}
+
+# IPv6 Client
+client localhost_ipv6 {
+        ipv6addr = ::1
+        secret = <Insert Secret Key>  # Ensure consistency in IPv4 and IPv6 secrets
+}
+
+
+#########################################################################################################################################################
+
+# Set Permissions and Ownership for the Clients Configuration file
+sudo chown freerad:freerad /etc/freeradius/3.0/clients.conf
+sudo chmod 640 /etc/freeradius/3.0/clients.conf
+
+#########################################################################################################################################################
+######################################################################### FILES #########################################################################
+#########################################################################################################################################################
+
+# Create the Files Configuration File:
+sudo mv /etc/freeradius/3.0/mods-enabled/files ~/freeradius/files
+sudo vim /etc/freeradius/3.0/mods-enabled/files
+
+#########################################################################################################################################################
+
+
+# -*- text -*-
+#
+#  $Id: e3f3bf568d92eba8eb17bbad590f846f2d9e1ac8 $
+
+# Livingston-style 'users' file
+#
+# See "man users" for more information.
+#
+files {
+        # Search for files in a subdirectory of mods-config which
+        # matches this instance of the files module.
+        moddir = ${modconfdir}/${.:instance}
+
+        # The default key attribute to use for matches.  The content
+        # of this attribute is used to match the "name" of the
+        # entry.
+        #key = "%{%{Stripped-User-Name}:-%{User-Name}}"
+
+        #  The old "users" style file is now located here.
+        filename = ${moddir}/authorize
+
+        #  This is accepted for backwards compatibility
+        #  It will be removed in a future release.
+#       usersfile = ${moddir}/authorize
+
+        #  These are accepted for backwards compatibility.
+        #  They will be renamed in a future release.
+        acctusersfile = ${moddir}/accounting
+        preproxy_usersfile = ${moddir}/pre-proxy
+}
+
+########################################################################################################################################################
+# Set Permissions and Ownership for the Files Configuration file
+
+
+
+#########################################################################################################################################################
+############################################################################ PAP ########################################################################
+#########################################################################################################################################################
+
+# Create the PAP Configuration File:
+sudo mv /etc/freeradius/3.0/mods-enabled/pap ~/freeradius/pap
+sudo vim /etc/freeradius/3.0/mods-enabled/pap
+
+#########################################################################################################################################################
+
+# -*- text -*-
+#
+#  $Id: 0038ecd154840c71ceff33ddfdd936e4e28e0bcd $
+
+# PAP module to authenticate users based on their stored password
+#
+#  Supports multiple encryption/hash schemes.  See "man rlm_pap"
+#  for details.
+#
+#  For instructions on creating the various types of passwords, see:
+#
+#  http://www.openldap.org/faq/data/cache/347.html
+pap {
+        #  By default the server will use heuristics to try and automatically
+        #  handle base64 or hex encoded passwords. This behaviour can be
+        #  stopped by setting the following to "no".
+        normalise = yes
+}
+
+
+#########################################################################################################################################################
+
+# Set Permissions and Ownership for the PAP Configuration file
+sudo chown freerad:freerad /etc/freeradius/3.0/mods-enabled/pap
+sudo chmod 640 /etc/freeradius/3.0/mods-enabled/pap
+
+
+  
+#########################################################################################################################################################
+############################################################################ DEFAULT ####################################################################
+#########################################################################################################################################################
+
+# Create the Default Configuration File:
+sudo mv /etc/freeradius/3.0/sites-enabled/default ~/freeradius/default
+sudo vim /etc/freeradius/3.0/sites-enabled/default
+
+#########################################################################################################################################################
+
+server default {
+listen {
+        type = auth
+        ipaddr = *
+        port = 0
+        limit {
+              max_connections = 16
+              lifetime = 0
+              idle_timeout = 30
+        }
+}
+
+listen {
+        ipaddr = *
+        port = 0
+        type = acct
+
+        limit {
+        }
+}
+
+listen {
+        type = auth
+        ipv6addr = ::   # any.  ::1 == localhost
+        port = 0
+        limit {
+              max_connections = 16
+              lifetime = 0
+              idle_timeout = 30
+        }
+}
+
+listen {
+        ipv6addr = ::
+        port = 0
+        type = acct
+
+        limit {
+        }
+}
+
+authorize {
+    filter_username
+    preprocess
+    chap
+    mschap
+    digest
+    suffix
+    eap {
+        ok = return
+    }
+    files
+    expiration
+    logintime
+    pap
+}
+
+authenticate {
+        Auth-Type PAP {
+                pap
+        }
+
+        Auth-Type CHAP {
+                chap
+        }
+
+        Auth-Type MS-CHAP {
+                mschap
+        }
+
+        mschap
+
+        digest
+
+        eap
+}
+
+
+preacct {
+        preprocess
+
+        acct_unique
+
+        suffix
+        files
+}
+
+accounting {
+        detail
+        unix
+        -sql
+
+        exec
+
+        attr_filter.accounting_response
+
+}
+
+
+session {
+}
+
+
+post-auth {
+
+        if (session-state:User-Name && reply:User-Name && request:User-Name && (reply:User-Name == request:User-Name)) {
+                update reply {
+                        &User-Name !* ANY
+                }
+        }
+        update {
+                &reply: += &session-state:
+        }
+
+        -sql
+        exec
+        remove_reply_message_if_eap
+        Post-Auth-Type REJECT {
+                -sql
+                attr_filter.access_reject
+
+                eap
+
+                remove_reply_message_if_eap
+        }
+
+        Post-Auth-Type Challenge {
+        }
+
+        Post-Auth-Type Client-Lost {
+        }
+
+        if (EAP-Key-Name && &reply:EAP-Session-Id) {
+                update reply {
+                        &EAP-Key-Name := &reply:EAP-Session-Id
+                }
+        }
+}
+
+pre-proxy {
+}
+
+post-proxy {
+        eap
+}
+}
+
+########################################################################################################################################################
+
+# Set Permissions and Ownership for the Default Configuration file
+sudo chmod 640 /etc/freeradius/3.0/sites-enabled/default
+sudo chown freerad:freerad /etc/freeradius/3.0/sites-enabled/default
+
+#########################################################################################################################################################
+############################################################################ USERS ######################################################################
+#########################################################################################################################################################
+
+# Create the Users Configuration File
+sudo mv /etc/freeradius/3.0/users ~/freeradius/users
+sudo vim /etc/freeradius/3.0/users
+
+#########################################################################################################################################################
+
+
+# User entries for WPA2-Enterprise
+bob Cleartext-Password := "bobspassword"
+alice Cleartext-Password := "alicespassword"
+
+# Default configurations
+DEFAULT Framed-Protocol == PPP
+        Framed-Protocol = PPP,
+        Framed-Compression = Van-Jacobson-TCP-IP
+
+DEFAULT Hint == "CSLIP"
+        Framed-Protocol = SLIP,
+        Framed-Compression = Van-Jacobson-TCP-IP
+
+DEFAULT Hint == "SLIP"
+        Framed-Protocol = SLIP
+
+
+#########################################################################################################################################################
+
+# Set Permissions and Ownership for the Users Configuration file
+sudo chmod 640 /etc/freeradius/3.0/users
+sudo chown freerad:freerad /etc/freeradius/3.0/users
+
+
+#########################################################################################################################################################
+############################################################################ RADIUSD ####################################################################
+#########################################################################################################################################################
+
+# Create the RADIUSD Configuration File
+sudo mv /etc/freeradius/3.0/radiusd.conf ~/freeradius/radiusd.conf
+sudo vim /etc/freeradius/3.0/radiusd.conf
+
+#########################################################################################################################################################
+
+prefix = /usr
+exec_prefix = /usr
+sysconfdir = /etc
+localstatedir = /var
+sbindir = ${exec_prefix}/sbin
+logdir = /var/log/freeradius
+raddbdir = /etc/freeradius/3.0
+radacctdir = ${logdir}/radacct
+
+name = freeradius
+
+confdir = ${raddbdir}
+modconfdir = ${confdir}/mods-config
+certdir = ${confdir}/certs
+cadir   = ${confdir}/certs
+run_dir = ${localstatedir}/run/${name}
+
+db_dir = ${raddbdir}
+
+libdir = /usr/lib/freeradius
+pidfile = ${run_dir}/${name}.pid
+max_request_time = 30
+cleanup_delay = 5
+max_requests = 16384
+hostname_lookups = no
+log {
+    destination = files
+    colourise = yes
+    file = ${logdir}/radius.log
+    level = debug
+    syslog_facility = daemon
+    stripped_names = no
+    auth = yes                      # Log authentication requests
+    auth_badpass = yes              # Log password failures
+    auth_goodpass = yes             # Log successful authentications
+    msg_goodpass = "User %{User-Name} authenticated successfully."
+    msg_badpass = "Failed authentication attempt for user %{User-Name}."
+    msg_denied = "You are already logged in - access denied"
+}
+Step-by-Step
+checkrad = ${sbindir}/checkrad
+
+ENV {
+}
+
+security {
+        user = freerad
+        group = freerad
+        allow_core_dumps = no
+        max_attributes = 200
+        reject_delay = 1
+        status_server = yes
+}
+
+proxy_requests  = yes
+$INCLUDE proxy.conf
+
+$INCLUDE clients.conf
+
+thread pool {
+        start_servers = 5
+        max_servers = 32
+        min_spare_servers = 3
+        max_spare_servers = 10
+        max_requests_per_server = 0
+        auto_limit_acct = no
+}
+modules {
+        $INCLUDE mods-enabled/
+}
+
+instantiate {
+}
+
+policy {
+        $INCLUDE policy.d/
+}
+
+$INCLUDE sites-enabled/
+
+
+########################################################################################################################################################
+
+# Set Permissions and Ownership for the Radiusd Configuration file
+sudo chown freerad:freerad /etc/freeradius/3.0/radiusd.conf
+sudo chmod 640 /etc/freeradius/3.0/radiusd.conf
+
+
+
+#########################################################################################################################################################
+######################################################################### AUTHORIZE #####################################################################
+#########################################################################################################################################################
+
+
+# Create the RADIUSD Configuration File
+sudo mv /etc/freeradius/3.0/mods-config/files/authorize ~/freeradius/authorize
+sudo vim /etc/freeradius/3.0/mods-config/files/authorize
+
+#########################################################################################################################################################
+
+# User definitions
+bob Cleartext-Password := "bobspassword"
+
+# Default configurations for various frame protocols
+DEFAULT Framed-Protocol == PPP
+        Framed-Protocol = PPP,
+        Framed-Compression = Van-Jacobson-TCP-IP
+
+DEFAULT Hint == "CSLIP"
+        Framed-Protocol = SLIP,
+        Framed-Compression = Van-Jacobson-TCP-IP
+
+DEFAULT Hint == "SLIP"
+        Framed-Protocol = SLIP
+
+
+
+
+
+
+
+#############################################
+################ DNSMASQ ####################
+#############################################
+
+# Interface configuration
+interface=wlan0
+bind-interfaces
+
+# DHCP configuration
+dhcp-range=192.168.10.50,192.168.10.150,12h
+dhcp-option=3,192.168.10.1  # Default Gateway
+dhcp-option=6,192.168.10.1  # DNS Server
+
+# DNS servers to use for upstream queries
+server=8.8.8.8
+server=8.8.4.4
+
+# Logging settings
+log-queries=extra
+log-dhcp
+log-facility=/var/log/dnsmasq.log
+
+
+#############################################
+################ HOSTAPD ####################
+#############################################
+
+interface=wlan0
+ssid=<SSID Name>
+hw_mode=g
+channel=7
+wmm_enabled=0
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=YourPassphrase
+wpa_key_mgmt=WPA-EAP
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP
+ieee8021x=1
+eap_reauth_period=360000000
+
+# Correct RADIUS server settings
+auth_server_addr=127.0.0.1
+auth_server_port=1812
+auth_server_shared_secret=<Insert Secret Key>
+acct_server_addr=127.0.0.1
+acct_server_port=1813
+acct_server_shared_secret=<Insert Secret Key>
+
+
+
+# Basic configuration
+interface=wlan0
+ssid=Silence of the LANs
+hw_mode=g
+channel=6
+
+# WPA and WPA2 configuration
+wpa=2
+wpa_key_mgmt=WPA-EAP
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP
+
+# IEEE 802.1X Auth Configuration
+ieee8021x=1
+auth_server_addr=127.0.0.1
+auth_server_port=1812
+auth_server_shared_secret=<Insert Secret Key>
+
+# RADIUS Accounting Configuration
+acct_server_addr=127.0.0.1
+acct_server_port=1813
+acct_server_shared_secret=<Insert Secret Key>
+
+# Optional configuration
+wmm_enabled=1
+ignore_broadcast_ssid=0
+
+
+
+
+###########################################
+############ NETWORK INTERFACES ###########
+###########################################
+
+source-directory /etc/network/interfaces.d
+
+# Loopback interface
+auto lo
+iface lo inet loopback
+
+# Wireless interface
+auto wlan0
+iface wlan0 inet static
+    address 192.168.10.1
+    netmask 255.255.255.0
+    network 192.168.10.0
+    broadcast 192.168.10.255
+
+
+# Loopback interface
+auto lo
+iface lo inet loopback
+
+# Wireless interface
+auto wlan0
+iface wlan0 inet static
+    address 192.168.10.1
+    netmask 255.255.255.0
+    network 192.168.10.0
+    broadcast 192.168.10.255
+
+
+##################################################################################
+################################### SYSLOG #######################################
+##################################################################################
+# /etc/rsyslog.conf configuration file for rsyslog
+#
+# For more information install rsyslog-doc and see
+# /usr/share/doc/rsyslog-doc/html/configuration/index.html
+
+#################
+#### MODULES ####
+#################
+
+module(load="imuxsock") # provides support for local system logging
+module(load="imklog")   # provides kernel logging support
+#module(load="immark")  # provides --MARK-- message capability
+
+# provides UDP syslog reception
+module(load="imudp")
+input(type="imudp" port="514")
+
+# provides TCP syslog reception
+module(load="imtcp")
+input(type="imtcp" port="514")
+
+###########################
+#### GLOBAL DIRECTIVES ####
+###########################
+
+#
+# Set the default permissions for all log files.
+#
+$FileOwner root
+$FileGroup adm
+$FileCreateMode 0640
+$DirCreateMode 0755
+$Umask 0022
+
+#
+# Where to place spool and state files
+#
+$WorkDirectory /var/spool/rsyslog
+
+#
+# Include all config files in /etc/rsyslog.d/
+#
+$IncludeConfig /etc/rsyslog.d/*.conf
+
+###############
+#### RULES ####
+###############
+
+#
+# Log anything besides private authentication messages to a single log file
+#
+*.*;auth,authpriv.none          -/var/log/syslog
+
+#
+# Log commonly used facilities to their own log file
+#
+auth,authpriv.*                 /var/log/auth.log
+cron.*                          -/var/log/cron.log
+kern.*                          -/var/log/kern.log
+mail.*                          -/var/log/mail.log
+user.*                          -/var/log/user.log
+
+#
+# Emergencies are sent to everybody logged in.
+#
+*.emerg                         :omusrmsg:*
+
+# Debug level logging
+*.debug                         /var/log/debug.log
+
+
+
+##############################################
+##############################################
+##############################################
+
+
+# If the restart is not successful
+# journalctl -xeu freeradius.service
+# sudo freeradius -X
+
+########################################################
+################## Verify Functioning ##################
+########################################################
+
+# In First Terminal:
+sudo freeradius -X
+
+# In Second Terminal:
+radtest bob bobspassword localhost 0 <Insert Secret Key>
+
+
+sudo journalctl -u hostapd.service -f
+sudo journalctl -u dnsmasq.service
+sudo tail -f /var/log/dnsmasq.log
+sudo cat /var/log/freeradius/radius.log
+sudo tail -f /var/log/debug.log
+sudo tail -f /var/log/syslog
+
+# Set Ownership and Permissions for the Freeradius Configuration Directories:
+sudo chown -R freerad:freerad /etc/freeradius
+sudo chown -R freerad:freerad /etc/freeradius/3.0
+sudo chmod -R 750 /etc/freeradius/3.0
+sudo chmod -R 640 /etc/freeradius/3.0/* # Run this as the root user
+sudo chmod 750 /etc/freeradius/3.0/sites-enabled
+sudo chmod +x /etc/freeradius/3.0/mods-config
+sudo chmod -R 640 /etc/freeradius/3.0/mods-config/preprocess
+sudo chmod +x /etc/freeradius/3.0/mods-config/preprocess
+
+# Misc
+sudo find /etc/freeradius/3.0 -type d -exec chmod 755 {} \;
+sudo find /etc/freeradius/3.0 -type f -exec chmod 644 {} \;
+sudo chown -R freerad:freerad /etc/freeradius/3.0
