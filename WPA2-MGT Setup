@@ -454,8 +454,95 @@ DEFAULT Hint == "SLIP"
 
 
 
+#########################################################################################################################################################
+######################################################################### EAP ###########################################################################
+#########################################################################################################################################################
+
+# Create the EAP Configuration File
+sudo mv /etc/freeradius/3.0/mods-enabled/eap ~/freeradius/eap
+sudo vim /etc/freeradius/3.0/mods-enabled/eap
+
+#########################################################################################################################################################
+
+eap {
+    default_eap_type = peap
+    timer_expire = 60
+    ignore_unknown_eap_types = no
+    cisco_accounting_username_bug = no
+    max_sessions = ${max_requests}
+
+    tls-config tls-common {
+        private_key_password = null
+        private_key_file = ${certdir}/server.key
+        certificate_file = ${certdir}/server.pem
+        ca_file = ${certdir}/ca.pem
+        dh_file = ${certdir}/dh
+        random_file = ${certdir}/random
+        fragment_size = 1024
+        include_length = yes
+        auto_chain = yes
+        check_crl = no
+        cipher_list = "DEFAULT"
+        ecdh_curve = "prime256v1"
+        tls_min_version = "1.2"
+        cache {
+            enable = no
+            lifetime = 24 # hours
+            max_entries = 255
+        }
+        verify {
+            skip_if_ocsp_ok = no
+        }
+        ocsp {
+            enable = no
+            override_cert_url = yes
+            url = "http://ocsp.mydomain.com"
+        }
+    }
+
+    tls {
+        tls-config = tls-common
+        private_key_file = /etc/freeradius/3.0/certs/server.key
+        certificate_file = /etc/freeradius/3.0/certs/server.pem
+        ca_file = /etc/freeradius/3.0/certs/ca.pem  # Ensure you have a valid CA certificate if required
+        # dh_file = /etc/freeradius/3.0/certs/dh
+        private_key_password = <Secret Key>
+        require_client_cert = yes
+    }
+
+    ttls {
+        tls-config = tls-common
+        default_eap_type = md5
+        copy_request_to_tunnel = no
+        use_tunneled_reply = no
+        virtual_server = "inner-tunnel"
+        include_length = yes
+    }
+
+    peap {
+        tls-config = tls-common
+        default_eap_type = mschapv2
+        copy_request_to_tunnel = yes
+        use_tunneled_reply = yes
+        require_client_cert = no
+        virtual_server = "inner-tunnel"  # Ensure the inner-tunnel virtual server is properly configured
+    }
+
+    mschapv2 {
+        send_error = no
+    }
+}
 
 
+#########################################################################################################################################################
+######################################################################### DICTIONARY ####################################################################
+#########################################################################################################################################################
+
+# Create the Dictionary Configuration File
+sudo mv /etc/freeradius/3.0/dictionary ~/freeradius/dictionary
+sudo vim /etc/freeradius/3.0/dictionary
+
+ATTRIBUTE       EAP-Message-Server      79      string
 
 
 #############################################
